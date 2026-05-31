@@ -112,8 +112,20 @@ export default class Slime extends Phaser.Physics.Arcade.Sprite {
     this.state = 'attack';
     this.anims.play(`${this.skin}-attack`, true);
 
+    // Aplicar daño con pequeño delay y comprobando distancia para permitir
+    // que los slimes golpeen desde cualquier lado (no solo frente)
     if (target && target.active) {
-      this.sceneRef.damagePlayer(1);
+      this.sceneRef.time.delayedCall(120, () => {
+        try {
+          if (!target.active) return;
+          const dist = Phaser.Math.Distance.Between(this.x, this.y, target.x, target.y);
+          if (dist <= this.attackRange + 6) {
+            this.sceneRef.damagePlayer(1);
+          }
+        } catch (e) {
+          // ignore
+        }
+      });
     }
 
     this.once(`animationcomplete-${this.skin}-attack`, () => {

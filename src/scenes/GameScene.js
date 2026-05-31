@@ -20,7 +20,7 @@ export default class GameScene extends Phaser.Scene {
     this.createSmallMap(room01);
     this.createPlayerAnimations();
 
-    const playerStart = this.getRandomSpawnPosition(room01) || { x: room01.spawn.x, y: room01.spawn.y };
+    const playerStart = (data.spawnAt && { x: data.spawnAt.x, y: data.spawnAt.y }) || this.getRandomSpawnPosition(room01) || { x: room01.spawn.x, y: room01.spawn.y };
     this.player = this.physics.add.sprite(playerStart.x, playerStart.y, 'michael-run-1');
     this.player.setOrigin(0.5, 1);
     this.player.setScale(2);
@@ -232,16 +232,18 @@ export default class GameScene extends Phaser.Scene {
     const used = [];
 
     for (let i = 0; i < count; i += 1) {
-      let pos = this.getRandomSpawnPosition(room);
+      // Solo spawnear slimes dentro de tiles con índice 51
+      let pos = this.getRandomSpawnPositionForTileIndex(room, 51);
       // Evitar spawnear encima del jugador o posiciones muy cercanas
       let attempts = 0;
       while (pos && Phaser.Math.Distance.Between(pos.x, pos.y, this.player.x, this.player.y) < 80 && attempts < 8) {
-        pos = this.getRandomSpawnPosition(room);
+        pos = this.getRandomSpawnPositionForTileIndex(room, 51);
         attempts += 1;
       }
 
       // Si no hay posiciones válidas, fallback a spawn relative al room
       if (!pos) {
+        // fallback en caso de no encontrar tile 51
         pos = { x: room.spawn.x + (i - 1) * 48, y: room.spawn.y + 80 };
       }
 
@@ -289,6 +291,38 @@ export default class GameScene extends Phaser.Scene {
     } catch (e) {
       this._walkablePositions = null;
     }
+  }
+
+  // Construye y cachea posiciones centradas de tiles que tengan un índice específico
+  buildPositionsForTileIndex(room, tileIndex) {
+    try {
+      const positions = [];
+      for (let ty = 0; ty < this.map.height; ty += 1) {
+        for (let tx = 0; tx < this.map.width; tx += 1) {
+          const floorT = this.floorLayer.getTileAt(tx, ty);
+          const topIdx = floorT && floorT.index !== -1 ? floorT.index : -1;
+          if (topIdx === tileIndex) {
+            positions.push({ x: tx * this.map.tileWidth + this.map.tileWidth / 2, y: ty * this.map.tileHeight + this.map.tileHeight / 2 });
+          }
+        }
+      }
+      this._positionsByTileIndex = this._positionsByTileIndex || {};
+      this._positionsByTileIndex[tileIndex] = positions;
+    } catch (e) {
+      this._positionsByTileIndex = this._positionsByTileIndex || {};
+      this._positionsByTileIndex[tileIndex] = [];
+    }
+  }
+
+  getRandomSpawnPositionForTileIndex(room, tileIndex) {
+    if (!this._positionsByTileIndex || !this._positionsByTileIndex[tileIndex] || this._positionsByTileIndex[tileIndex].length === 0) {
+      this.buildPositionsForTileIndex(room, tileIndex);
+    }
+
+    const list = this._positionsByTileIndex[tileIndex] || [];
+    if (!list || list.length === 0) return null;
+    const idx = Phaser.Math.Between(0, list.length - 1);
+    return list[idx];
   }
 
   // Devuelve una posición aleatoria dentro de tiles caminables del room
@@ -348,8 +382,14 @@ export default class GameScene extends Phaser.Scene {
     this.updateHud();
     this.showMessage('Room completado');
 
+    // No reiniciar al recoger la llave: el jugador conserva su posición.
+    // Incrementar nivel y spawnear los slimes del siguiente nivel.
     this.time.delayedCall(500, () => {
-      this.scene.restart({ roomIndex: this.roomIndex + 1, score: this.score });
+      this.roomIndex = (this.roomIndex || 1) + 1;
+      this.updateHud();
+      this.showMessage(`Nivel ${this.roomIndex}`);
+      // spawnear nuevos slimes para el siguiente nivel
+      this.spawnRoomSlimes(this.currentRoom || room01);
     });
   }
 

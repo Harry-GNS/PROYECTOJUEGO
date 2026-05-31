@@ -14,6 +14,7 @@ export default class GameScene extends Phaser.Scene {
     this.playerInvulnerableUntil = 0;
     this.gameOver = false;
     this.roomKey = null;
+    this.keyCollected = false;
 
     this.createGameplayTextures();
     this.createSlimeAnimations();
@@ -325,6 +326,70 @@ export default class GameScene extends Phaser.Scene {
     return list[idx];
   }
 
+  spawnSingleSlime(room) {
+    // spawn one slime on tile index 51 (try a few times to avoid player)
+    let pos = this.getRandomSpawnPositionForTileIndex(room, 51);
+    let attempts = 0;
+    while (pos && Phaser.Math.Distance.Between(pos.x, pos.y, this.player.x, this.player.y) < 80 && attempts < 8) {
+      pos = this.getRandomSpawnPositionForTileIndex(room, 51);
+      attempts += 1;
+    }
+
+    if (!pos) {
+      pos = { x: room.spawn.x + 32, y: room.spawn.y + 80 };
+    }
+
+    const skin = Phaser.Math.Between(0, 100) <= 25 ? 'slime2' : 'slime';
+    const textureKey = `${skin}-idle`;
+    const baseDetection = 420;
+    const levelBonus = Math.max(0, (this.roomIndex || 1) - 1) * 20;
+    const slime = new Slime(this, pos.x, pos.y, {
+      textureKey,
+      health: 2,
+      speed: 70,
+      detectionRange: baseDetection + levelBonus,
+      attackRange: 42
+    });
+
+    this.slimeGroup.add(slime);
+    this.physics.add.collider(slime, this.wallLayer);
+    this.physics.add.collider(slime, this.player);
+    this.updateHud();
+  }
+
+  spawnAdditionalSlimes(room, count) {
+    for (let i = 0; i < count; i += 1) {
+      // reuse logic from spawnSingleSlime
+      let pos = this.getRandomSpawnPositionForTileIndex(room, 51);
+      let attempts = 0;
+      while (pos && Phaser.Math.Distance.Between(pos.x, pos.y, this.player.x, this.player.y) < 80 && attempts < 8) {
+        pos = this.getRandomSpawnPositionForTileIndex(room, 51);
+        attempts += 1;
+      }
+
+      if (!pos) {
+        pos = { x: room.spawn.x + (i - 1) * 48, y: room.spawn.y + 80 };
+      }
+
+      const skin = Phaser.Math.Between(0, 100) <= 25 ? 'slime2' : 'slime';
+      const textureKey = `${skin}-idle`;
+      const baseDetection = 420;
+      const levelBonus = Math.max(0, (this.roomIndex || 1) - 1) * 20;
+      const slime = new Slime(this, pos.x, pos.y, {
+        textureKey,
+        health: 2,
+        speed: 70,
+        detectionRange: baseDetection + levelBonus,
+        attackRange: 42
+      });
+
+      this.slimeGroup.add(slime);
+      this.physics.add.collider(slime, this.wallLayer);
+      this.physics.add.collider(slime, this.player);
+    }
+    this.updateHud();
+  }
+
   // Devuelve una posición aleatoria dentro de tiles caminables del room
   getRandomSpawnPosition(room) {
     if (!this._walkablePositions || this._walkablePositions.length === 0) {
@@ -360,7 +425,7 @@ export default class GameScene extends Phaser.Scene {
   }
 
   spawnRoomKey() {
-    if (this.roomKey) {
+    if (this.roomKey || this.keyCollected) {
       return;
     }
 
@@ -368,7 +433,11 @@ export default class GameScene extends Phaser.Scene {
     this.roomKey.setImmovable(true);
     this.roomKey.body.setAllowGravity(false);
     this.roomKey.setDepth(22);
-    this.physics.add.overlap(this.player, this.roomKey, this.collectRoomKey, null, this);
+    // keep a reference to the overlap so we can disable it immediately on collect
+    if (this.roomKeyOverlap) {
+      try { this.roomKeyOverlap.destroy(); } catch (e) {}
+    }
+    this.roomKeyOverlap = this.physics.add.overlap(this.player, this.roomKey, this.collectRoomKey, null, this);
   }
 
   collectRoomKey() {
@@ -376,20 +445,36 @@ export default class GameScene extends Phaser.Scene {
       return;
     }
 
-    this.roomKey.destroy();
-    this.roomKey = null;
+    if (this.keyCollected) return;
+    this.keyCollected = true;
+
+    // disable overlap immediately to avoid duplicate triggers
+    try {
+      if (this.roomKeyOverlap) {
+        this.roomKeyOverlap.destroy();
+        this.roomKeyOverlap = null;
+      }
+    } catch (e) {}
+
+    if (this.roomKey) {
+      this.roomKey.destroy();
+      this.roomKey = null;
+    }
     this.score += 100;
     this.updateHud();
     this.showMessage('Room completado');
 
     // No reiniciar al recoger la llave: el jugador conserva su posición.
-    // Incrementar nivel y spawnear los slimes del siguiente nivel.
+    // Incrementar nivel y spawnear UN slime adicional para el siguiente nivel.
     this.time.delayedCall(500, () => {
       this.roomIndex = (this.roomIndex || 1) + 1;
       this.updateHud();
       this.showMessage(`Nivel ${this.roomIndex}`);
-      // spawnear nuevos slimes para el siguiente nivel
-      this.spawnRoomSlimes(this.currentRoom || room01);
+      // spawnear varios slimes al avanzar: cantidad = nivel actual (cap para seguridad)
+      const spawnCount = Math.min(Math.max(1, this.roomIndex || 1), 6);
+      this.spawnAdditionalSlimes(this.currentRoom || room01, spawnCount);
+      // permitir nuevo ciclo de llave después del spawn
+      this.keyCollected = false;
     });
   }
 

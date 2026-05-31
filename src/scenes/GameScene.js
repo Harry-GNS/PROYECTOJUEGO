@@ -255,11 +255,13 @@ export default class GameScene extends Phaser.Scene {
       // Random skin: 'slime' or 'slime2' (only visual)
       const skin = Phaser.Math.Between(0, 100) <= 25 ? 'slime2' : 'slime';
       const textureKey = `${skin}-idle`;
+      const baseDetection = 420; // base detection distance
+      const levelBonus = Math.max(0, (this.roomIndex || 1) - 1) * 20;
       const slime = new Slime(this, pos.x, pos.y, {
         textureKey,
         health: 2,
         speed: 70,
-        detectionRange: 240,
+        detectionRange: baseDetection + levelBonus,
         attackRange: 42
       });
 

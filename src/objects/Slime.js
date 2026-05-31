@@ -37,7 +37,7 @@ export default class Slime extends Phaser.Physics.Arcade.Sprite {
     this.maxHealth = config.health ?? 2;
     this.health = this.maxHealth;
     this.speed = config.speed ?? 70;
-    this.detectionRange = config.detectionRange ?? 220;
+    this.detectionRange = config.detectionRange ?? 420;
     this.attackRange = config.attackRange ?? 42;
     this.attackCooldown = config.attackCooldown ?? 1000;
     this.nextAttackAt = 0;

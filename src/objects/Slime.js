@@ -2,26 +2,28 @@ import Phaser from 'phaser';
 
 export default class Slime extends Phaser.Physics.Arcade.Sprite {
   static ensureAnimations(scene) {
-    const animations = [
-      { key: 'slime-idle', texture: 'slime-idle', start: 0, end: 5, frameRate: 8, repeat: -1 },
-      { key: 'slime-run', texture: 'slime-run', start: 0, end: 7, frameRate: 10, repeat: -1 },
-      { key: 'slime-attack', texture: 'slime-attack', start: 0, end: 9, frameRate: 10, repeat: 0 },
-      { key: 'slime-hurt', texture: 'slime-hurt', start: 0, end: 4, frameRate: 12, repeat: 0 },
-      { key: 'slime-death', texture: 'slime-death', start: 0, end: 9, frameRate: 10, repeat: 0 }
+    const skins = ['slime', 'slime2'];
+    const defs = [
+      { name: 'idle', start: 0, end: 5, frameRate: 8, repeat: -1 },
+      { name: 'run', start: 0, end: 7, frameRate: 10, repeat: -1 },
+      { name: 'attack', start: 0, end: 9, frameRate: 10, repeat: 0 },
+      { name: 'hurt', start: 0, end: 4, frameRate: 12, repeat: 0 },
+      { name: 'death', start: 0, end: 9, frameRate: 10, repeat: 0 }
     ];
 
-    animations.forEach((animation) => {
-      if (!scene.anims.exists(animation.key)) {
-        scene.anims.create({
-          key: animation.key,
-          frames: scene.anims.generateFrameNumbers(animation.texture, {
-            start: animation.start,
-            end: animation.end
-          }),
-          frameRate: animation.frameRate,
-          repeat: animation.repeat
-        });
-      }
+    skins.forEach((skin) => {
+      defs.forEach((d) => {
+        const key = `${skin}-${d.name}`;
+        const texture = key; // texture names match keys loaded in BootScene
+        if (!scene.anims.exists(key)) {
+          scene.anims.create({
+            key,
+            frames: scene.anims.generateFrameNumbers(texture, { start: d.start, end: d.end }),
+            frameRate: d.frameRate,
+            repeat: d.repeat
+          });
+        }
+      });
     });
   }
 
@@ -43,6 +45,9 @@ export default class Slime extends Phaser.Physics.Arcade.Sprite {
     this.hurtUntil = 0;
     this.isDead = false;
     this.state = 'idle';
+
+    // skin prefix (e.g. 'slime' or 'slime2') derived from textureKey
+    this.skin = (config.textureKey || 'slime-idle').split('-')[0];
 
     this.setOrigin(0.5, 0.5);
     this.setScale(config.scale ?? 1.45);
@@ -77,7 +82,7 @@ export default class Slime extends Phaser.Physics.Arcade.Sprite {
 
     if (distance <= this.detectionRange) {
       this.state = 'run';
-      this.anims.play('slime-run', true);
+      this.anims.play(`${this.skin}-run`, true);
 
       const angle = Phaser.Math.Angle.Between(this.x, this.y, target.x, target.y);
       this.sceneRef.physics.velocityFromRotation(angle, this.speed, this.body.velocity);
@@ -85,7 +90,7 @@ export default class Slime extends Phaser.Physics.Arcade.Sprite {
     }
 
     this.state = 'idle';
-    this.anims.play('slime-idle', true);
+    this.anims.play(`${this.skin}-idle`, true);
 
     if (time >= this.nextWanderAt) {
       const angle = Phaser.Math.FloatBetween(0, Math.PI * 2);
@@ -98,23 +103,23 @@ export default class Slime extends Phaser.Physics.Arcade.Sprite {
 
   playAttack(target) {
     if (this.sceneRef.time.now < this.nextAttackAt) {
-      this.anims.play('slime-idle', true);
+      this.anims.play(`${this.skin}-idle`, true);
       return;
     }
 
     this.nextAttackAt = this.sceneRef.time.now + this.attackCooldown;
     this.body.setVelocity(0, 0);
     this.state = 'attack';
-    this.anims.play('slime-attack', true);
+    this.anims.play(`${this.skin}-attack`, true);
 
     if (target && target.active) {
       this.sceneRef.damagePlayer(1);
     }
 
-    this.once('animationcomplete-slime-attack', () => {
+    this.once(`animationcomplete-${this.skin}-attack`, () => {
       if (!this.isDead) {
         this.state = 'idle';
-        this.anims.play('slime-idle', true);
+        this.anims.play(`${this.skin}-idle`, true);
       }
     });
   }
@@ -134,12 +139,12 @@ export default class Slime extends Phaser.Physics.Arcade.Sprite {
     this.state = 'hurt';
     this.hurtUntil = this.sceneRef.time.now + 180;
     this.body.setVelocity(0, 0);
-    this.anims.play('slime-hurt', true);
+    this.anims.play(`${this.skin}-hurt`, true);
 
-    this.once('animationcomplete-slime-hurt', () => {
+    this.once(`animationcomplete-${this.skin}-hurt`, () => {
       if (!this.isDead) {
         this.state = 'idle';
-        this.anims.play('slime-idle', true);
+        this.anims.play(`${this.skin}-idle`, true);
       }
     });
   }
@@ -155,13 +160,25 @@ export default class Slime extends Phaser.Physics.Arcade.Sprite {
     this.body.setVelocity(0, 0);
     // Reproducir efecto de sonido de muerte si está disponible
     try {
-      this.sceneRef.sound.play('sfx-slime-death', { volume: 0.20 });
+      this.sceneRef.sound.play('sfx-slime-death', { volume: 0.35 });
     } catch (e) {
       // Si el sonido no está cargado o hay un error, no interrumpimos la lógica
     }
-    this.anims.play('slime-death', true);
 
-    this.once('animationcomplete-slime-death', () => {
+    // Chance de soltar un corazón que restaura vida (20%)
+    try {
+      if (this.sceneRef && typeof this.sceneRef.spawnHeartAt === 'function') {
+        const chance = Phaser.Math.Between(1, 100);
+        if (chance <= 20) {
+          this.sceneRef.spawnHeartAt(this.x, this.y);
+        }
+      }
+    } catch (e) {
+      // ignore
+    }
+    this.anims.play(`${this.skin}-death`, true);
+
+    this.once(`animationcomplete-${this.skin}-death`, () => {
       this.destroy();
     });
   }

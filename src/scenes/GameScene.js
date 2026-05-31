@@ -10,6 +10,7 @@ export default class GameScene extends Phaser.Scene {
     this.roomIndex = data.roomIndex ?? 1;
     this.score = data.score ?? 0;
     this.playerHealth = 3;
+    this.playerMaxHealth = 3;
     this.playerInvulnerableUntil = 0;
     this.gameOver = false;
     this.roomKey = null;
@@ -19,7 +20,8 @@ export default class GameScene extends Phaser.Scene {
     this.createSmallMap(room01);
     this.createPlayerAnimations();
 
-    this.player = this.physics.add.sprite(room01.spawn.x, room01.spawn.y, 'michael-run-1');
+    const playerStart = this.getRandomSpawnPosition(room01) || { x: room01.spawn.x, y: room01.spawn.y };
+    this.player = this.physics.add.sprite(playerStart.x, playerStart.y, 'michael-run-1');
     this.player.setOrigin(0.5, 1);
     this.player.setScale(2);
     this.player.body.setCollideWorldBounds(true);
@@ -56,14 +58,18 @@ export default class GameScene extends Phaser.Scene {
     this.isPunching = false;
     this.punchCooldownUntil = 0;
 
-    this.hudText = this.add.text(12, 12, '', {
+    // Barra de vida (barra negra de fondo + barra roja llenable)
+    this.healthBarBg = this.add.rectangle(12, 12, 84, 14, 0x000000, 0.6).setOrigin(0, 0).setDepth(1000).setScrollFactor(0);
+    this.healthBarFill = this.add.rectangle(14, 14, 80, 10, 0xff4444).setOrigin(0, 0).setDepth(1001).setScrollFactor(0);
+
+    this.hudText = this.add.text(12, 30, '', {
       fontSize: '14px',
       color: '#ffffff'
     }).setDepth(1000).setScrollFactor(0);
 
     // ── Texto de instrucciones (M añadido) ───────────────────────────────────
     this.instructionText = this.add.text(
-      12, 32,
+      12, 46,
       'F: pantalla completa | G: debug tiles | SPACE: golpear | M: silenciar',
       { fontSize: '12px', color: '#d8f7ff' }
     ).setDepth(1000).setScrollFactor(0);
@@ -76,11 +82,7 @@ export default class GameScene extends Phaser.Scene {
       padding: { x: 10, y: 4 }
     }).setOrigin(0.5).setDepth(1000).setScrollFactor(0);
 
-    this.collisionDebugText = this.add.text(12, 52, '', {
-      fontSize: '12px',
-      color: '#ffdddd',
-      backgroundColor: '#00000088'
-    }).setDepth(1000).setScrollFactor(0);
+    // (debug panel removed)
 
     this.updateHud();
 
@@ -165,19 +167,7 @@ export default class GameScene extends Phaser.Scene {
       this.lastValidPos.y = this.player.y;
     }
 
-    if (this.collisionDebugText && this.map) {
-      const centerX = this.player.x;
-      const centerY = this.player.y;
-      const tx = this.map.worldToTileX(centerX);
-      const ty = this.map.worldToTileY(centerY);
-      const info = [
-        `map:${this.map.width}x${this.map.height}`,
-        `playerTile:${tx},${ty}`,
-        `slimes:${this.slimeGroup.countActive(true)}`,
-        `key:${this.roomKey ? 'yes' : 'no'}`
-      ];
-      this.collisionDebugText.setText(info);
-    }
+    // debug panel disabled
   }
 
   // ── MÚSICA: silenciar / activar ──────────────────────────────────────────
@@ -199,6 +189,37 @@ export default class GameScene extends Phaser.Scene {
       keyGraphics.generateTexture('room-key', 16, 16);
       keyGraphics.destroy();
     }
+    if (!this.textures.exists('heart')) {
+      const g = this.add.graphics();
+      g.fillStyle(0xff4d6d, 1);
+      g.fillCircle(5, 5, 4);
+      g.fillCircle(11, 5, 4);
+      g.fillTriangle(2, 8, 14, 8, 8, 14);
+      g.generateTexture('heart', 16, 16);
+      g.destroy();
+    }
+  }
+
+  spawnHeartAt(x, y) {
+    if (!this.map) return;
+    const heart = this.physics.add.image(x, y, 'heart');
+    heart.setDepth(25);
+    heart.setScale(1.5);
+    heart.body.setAllowGravity(false);
+    heart.setImmovable(true);
+    // overlap con jugador
+    this.physics.add.overlap(this.player, heart, this.collectHeart, null, this);
+    // auto-destroy tras 8s
+    this.time.delayedCall(8000, () => {
+      if (heart && heart.active) heart.destroy();
+    });
+  }
+
+  collectHeart(player, heart) {
+    if (!heart || !heart.active) return;
+    heart.destroy();
+    this.playerHealth = Math.min(this.playerMaxHealth, this.playerHealth + 1);
+    this.updateHud();
   }
 
   createSlimeAnimations() {
@@ -206,14 +227,36 @@ export default class GameScene extends Phaser.Scene {
   }
 
   spawnRoomSlimes(room) {
-    const spawnPoints = [
-      { x: room.spawn.x - 180, y: room.spawn.y - 120 },
-      { x: room.spawn.x + 180, y: room.spawn.y - 120 },
-      { x: room.spawn.x, y: room.spawn.y + 160 }
-    ];
+    // Número base de slimes = 3, aumentar 1 por cada nivel adicional
+    const count = 3 + Math.max(0, (this.roomIndex || 1) - 1);
+    const used = [];
 
-    spawnPoints.forEach(({ x, y }) => {
-      const slime = new Slime(this, x, y, {
+    for (let i = 0; i < count; i += 1) {
+      let pos = this.getRandomSpawnPosition(room);
+      // Evitar spawnear encima del jugador o posiciones muy cercanas
+      let attempts = 0;
+      while (pos && Phaser.Math.Distance.Between(pos.x, pos.y, this.player.x, this.player.y) < 80 && attempts < 8) {
+        pos = this.getRandomSpawnPosition(room);
+        attempts += 1;
+      }
+
+      // Si no hay posiciones válidas, fallback a spawn relative al room
+      if (!pos) {
+        pos = { x: room.spawn.x + (i - 1) * 48, y: room.spawn.y + 80 };
+      }
+
+      // Asegurar unicidad aproximada
+      if (used.some((p) => Phaser.Math.Distance.Between(p.x, p.y, pos.x, pos.y) < 48)) {
+        pos.x += 32 * (i % 2 === 0 ? 1 : -1);
+        pos.y += 16 * (i % 3 === 0 ? 1 : -1);
+      }
+      used.push(pos);
+
+      // Random skin: 'slime' or 'slime2' (only visual)
+      const skin = Phaser.Math.Between(0, 100) <= 25 ? 'slime2' : 'slime';
+      const textureKey = `${skin}-idle`;
+      const slime = new Slime(this, pos.x, pos.y, {
+        textureKey,
         health: 2,
         speed: 70,
         detectionRange: 240,
@@ -223,7 +266,42 @@ export default class GameScene extends Phaser.Scene {
       this.slimeGroup.add(slime);
       this.physics.add.collider(slime, this.wallLayer);
       this.physics.add.collider(slime, this.player);
-    });
+    }
+  }
+
+  // Construye una lista de posiciones world centradas en tiles caminables del room
+  buildWalkablePositions(room) {
+    try {
+      const walkable = new Set(room.walkableTiles || []);
+      const positions = [];
+      for (let ty = 0; ty < this.map.height; ty += 1) {
+        for (let tx = 0; tx < this.map.width; tx += 1) {
+          const tile = this.floorLayer.getTileAt(tx, ty) || this.decoLayer.getTileAt(tx, ty) || this.wallLayer.getTileAt(tx, ty);
+          const idx = tile && tile.index !== -1 ? tile.index : -1;
+          if (walkable.has(idx)) {
+            positions.push({ x: tx * this.map.tileWidth + this.map.tileWidth / 2, y: ty * this.map.tileHeight + this.map.tileHeight / 2 });
+          }
+        }
+      }
+      this._walkablePositions = positions;
+    } catch (e) {
+      this._walkablePositions = null;
+    }
+  }
+
+  // Devuelve una posición aleatoria dentro de tiles caminables del room
+  getRandomSpawnPosition(room) {
+    if (!this._walkablePositions || this._walkablePositions.length === 0) {
+      // Construir si no existe (se llama desde create justo después de map creado)
+      this.buildWalkablePositions(room);
+    }
+
+    if (!this._walkablePositions || this._walkablePositions.length === 0) {
+      return null;
+    }
+
+    const idx = Phaser.Math.Between(0, this._walkablePositions.length - 1);
+    return this._walkablePositions[idx];
   }
 
   updateSlimes(time) {
@@ -332,8 +410,22 @@ export default class GameScene extends Phaser.Scene {
 
     const aliveSlimes = this.slimeGroup ? this.slimeGroup.countActive(true) : 0;
     this.hudText.setText(
-      `Nivel: ${this.roomIndex} | Vida: ${Math.max(this.playerHealth, 0)} | Slimes: ${aliveSlimes} | Puntos: ${this.score}`
+      `Nivel: ${this.roomIndex} | Slimes: ${aliveSlimes} | Puntos: ${this.score}`
     );
+
+    // Actualizar barra de vida
+    if (this.healthBarFill && this.playerMaxHealth) {
+      const pct = Math.max(0, this.playerHealth) / this.playerMaxHealth;
+      this.healthBarFill.width = Math.max(0, Math.round(80 * pct));
+      // cambiar color según porcentaje (verde->amarillo->rojo)
+      if (pct > 0.66) {
+        this.healthBarFill.fillColor = 0x44ff66;
+      } else if (pct > 0.33) {
+        this.healthBarFill.fillColor = 0xffcc33;
+      } else {
+        this.healthBarFill.fillColor = 0xff4444;
+      }
+    }
   }
 
   getFacingDirection() {
@@ -747,13 +839,7 @@ export default class GameScene extends Phaser.Scene {
       const worldY = tile.pixelY + this.map.tileHeight / 2;
       const rect = this.add.rectangle(worldX, worldY, this.map.tileWidth, this.map.tileHeight, 0xff0000, 0.4).setDepth(2000);
       this.time.delayedCall(200, () => rect.destroy());
-      if (this.collisionDebugText) {
-        this.collisionDebugText.setText([
-          `collided: idx=${idx} @(${tx},${ty})`,
-          `floor=${floorT && floorT.index} wall=${wallT && wallT.index} deco=${decoT && decoT.index}`,
-          `walkable=${JSON.stringify(this.currentRoom && this.currentRoom.walkableTiles)}`
-        ]);
-      }
+      // collision debug output disabled
     } catch (e) {
       // ignore
     }

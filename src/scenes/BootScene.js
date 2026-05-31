@@ -57,6 +57,27 @@ export default class BootScene extends Phaser.Scene {
       frameWidth: 64,
       frameHeight: 64
     });
+    // Slime variante 2 (solo skin)
+    this.load.spritesheet('slime2-idle', new URL(`${slimeFolder}/Slime2_Idle_full.png`, import.meta.url).href, {
+      frameWidth: 64,
+      frameHeight: 64
+    });
+    this.load.spritesheet('slime2-run', new URL(`${slimeFolder}/Slime2_Run_full.png`, import.meta.url).href, {
+      frameWidth: 64,
+      frameHeight: 64
+    });
+    this.load.spritesheet('slime2-attack', new URL(`${slimeFolder}/Slime2_Attack_full.png`, import.meta.url).href, {
+      frameWidth: 64,
+      frameHeight: 64
+    });
+    this.load.spritesheet('slime2-hurt', new URL(`${slimeFolder}/Slime2_Hurt_full.png`, import.meta.url).href, {
+      frameWidth: 64,
+      frameHeight: 64
+    });
+    this.load.spritesheet('slime2-death', new URL(`${slimeFolder}/Slime2_Death_full.png`, import.meta.url).href, {
+      frameWidth: 64,
+      frameHeight: 64
+    });
 
     // ── MÚSICA ──────────────────────────────────────────────────────────────
     // Se cargan ambos formatos (OGG + MP3) para máxima compatibilidad entre
@@ -98,7 +119,8 @@ export default class BootScene extends Phaser.Scene {
     const tilesetTexture = this.textures.get('tileset');
     tilesetTexture.setFilter(Phaser.Textures.FilterMode.NEAREST);
 
-    ['slime-idle', 'slime-run', 'slime-attack', 'slime-hurt', 'slime-death'].forEach((key) => {
+    ['slime-idle', 'slime-run', 'slime-attack', 'slime-hurt', 'slime-death',
+     'slime2-idle', 'slime2-run', 'slime2-attack', 'slime2-hurt', 'slime2-death'].forEach((key) => {
       this.textures.get(key).setFilter(Phaser.Textures.FilterMode.NEAREST);
     });
 

@@ -1,5 +1,7 @@
 import Phaser from 'phaser';
 import room01 from '../maps/room01.js';
+import room02 from '../maps/room02.js';
+import room03 from '../maps/room03.js';
 import Slime from '../objects/Slime.js';
 
 export default class GameScene extends Phaser.Scene {
@@ -18,10 +20,13 @@ export default class GameScene extends Phaser.Scene {
 
     this.createGameplayTextures();
     this.createSlimeAnimations();
-    this.createSmallMap(room01);
+    
+    // Obtener el mapa correcto basado en roomIndex
+    const currentRoomMap = this.getRoomMapByIndex(this.roomIndex);
+    this.createSmallMap(currentRoomMap);
     this.createPlayerAnimations();
 
-    const playerStart = (data.spawnAt && { x: data.spawnAt.x, y: data.spawnAt.y }) || this.getRandomSpawnPosition(room01) || { x: room01.spawn.x, y: room01.spawn.y };
+    const playerStart = (data.spawnAt && { x: data.spawnAt.x, y: data.spawnAt.y }) || this.getRandomSpawnPosition(currentRoomMap) || { x: currentRoomMap.spawn.x, y: currentRoomMap.spawn.y };
     this.player = this.physics.add.sprite(playerStart.x, playerStart.y, 'michael-run-1');
     this.player.setOrigin(0.5, 1);
     this.player.setScale(2);
@@ -45,7 +50,7 @@ export default class GameScene extends Phaser.Scene {
 
     this.slimeGroup = this.physics.add.group();
 
-    this.spawnRoomSlimes(room01);
+    this.spawnRoomSlimes(currentRoomMap);
 
     this.physics.world.setBounds(0, 0, this.map.widthInPixels, this.map.heightInPixels);
     this.cameras.main.setBounds(0, 0, this.map.widthInPixels, this.map.heightInPixels);
@@ -259,11 +264,17 @@ export default class GameScene extends Phaser.Scene {
       const skin = Phaser.Math.Between(0, 100) <= 25 ? 'slime2' : 'slime';
       const textureKey = `${skin}-idle`;
       const baseDetection = 420; // base detection distance
-      const levelBonus = Math.max(0, (this.roomIndex || 1) - 1) * 20;
+      const roomNum = Math.max(0, (this.roomIndex || 1));
+      const levelBonus = Math.max(0, roomNum - 1) * 20;
+      const baseHealth = 2;
+      const healthBonus = Math.max(0, roomNum - 1) * 2; // Aumenta vida: Cuarto 1=2HP, Cuarto 2=4HP, Cuarto 3=6HP
+      const baseSpeed = 70;
+      const speedBonus = Math.max(0, roomNum - 1) * 15; // Aumenta velocidad
+      
       const slime = new Slime(this, pos.x, pos.y, {
         textureKey,
-        health: 2,
-        speed: 70,
+        health: baseHealth + healthBonus,
+        speed: baseSpeed + speedBonus,
         detectionRange: baseDetection + levelBonus,
         attackRange: 42
       });
@@ -374,11 +385,17 @@ export default class GameScene extends Phaser.Scene {
       const skin = Phaser.Math.Between(0, 100) <= 25 ? 'slime2' : 'slime';
       const textureKey = `${skin}-idle`;
       const baseDetection = 420;
-      const levelBonus = Math.max(0, (this.roomIndex || 1) - 1) * 20;
+      const roomNum = Math.max(0, (this.roomIndex || 1));
+      const levelBonus = Math.max(0, roomNum - 1) * 20;
+      const baseHealth = 2;
+      const healthBonus = Math.max(0, roomNum - 1) * 2;
+      const baseSpeed = 70;
+      const speedBonus = Math.max(0, roomNum - 1) * 15;
+      
       const slime = new Slime(this, pos.x, pos.y, {
         textureKey,
-        health: 2,
-        speed: 70,
+        health: baseHealth + healthBonus,
+        speed: baseSpeed + speedBonus,
         detectionRange: baseDetection + levelBonus,
         attackRange: 42
       });
@@ -448,7 +465,6 @@ export default class GameScene extends Phaser.Scene {
     if (this.keyCollected) return;
     this.keyCollected = true;
 
-    // disable overlap immediately to avoid duplicate triggers
     try {
       if (this.roomKeyOverlap) {
         this.roomKeyOverlap.destroy();
@@ -462,20 +478,28 @@ export default class GameScene extends Phaser.Scene {
     }
     this.score += 100;
     this.updateHud();
-    this.showMessage('Room completado');
+    this.showMessage('¡Habitación completada!');
 
-    // No reiniciar al recoger la llave: el jugador conserva su posición.
-    // Incrementar nivel y spawnear UN slime adicional para el siguiente nivel.
-    this.time.delayedCall(500, () => {
-      this.roomIndex = (this.roomIndex || 1) + 1;
-      this.updateHud();
-      this.showMessage(`Nivel ${this.roomIndex}`);
-      // spawnear varios slimes al avanzar: cantidad = nivel actual (cap para seguridad)
-      const spawnCount = Math.min(Math.max(1, this.roomIndex || 1), 6);
-      this.spawnAdditionalSlimes(this.currentRoom || room01, spawnCount);
-      // permitir nuevo ciclo de llave después del spawn
-      this.keyCollected = false;
-    });
+    // Verificar si es la última habitación
+    if (this.roomIndex >= 3) {
+      this.time.delayedCall(1000, () => {
+        this.gameOver = true;
+        this.score += 500; 
+        this.showMessage(`¡VICTORIA! Puntuación final: ${this.score}`);
+        this.time.delayedCall(3000, () => {
+          this.scene.start('MenuScene', { score: this.score });
+        });
+      });
+    } else {
+      // === CÓDIGO CORREGIDO PARA CAMBIO DE HABITACIÓN ===
+      this.time.delayedCall(500, () => {
+        // Reiniciamos la escena por completo pasando el nuevo cuarto y manteniendo el puntaje
+        this.scene.restart({ 
+          roomIndex: (this.roomIndex || 1) + 1, 
+          score: this.score 
+        });
+      });
+    }
   }
 
   startPunch() {
@@ -489,12 +513,24 @@ export default class GameScene extends Phaser.Scene {
 
     const punchAnimationKey = this.getPunchAnimationKey(this.lastFacing.direction);
     this.isPunching = true;
-    this.punchCooldownUntil = this.time.now + 260;
+    this.punchCooldownUntil = this.time.now + 300; // Cooldown ligeramente más largo para mejor feel
     this.playerInvulnerableUntil = Math.max(this.playerInvulnerableUntil, this.time.now + 180);
     this.player.anims.play(punchAnimationKey, true);
 
+    // Crear efecto visual de ataque: pequeño flash o brillo
+    const originalTint = this.player.tintTopLeft;
+    this.player.setTint(0xffffaa);
+    this.time.delayedCall(50, () => {
+      if (this.player && this.player.active) {
+        this.player.clearTint();
+      }
+    });
+
     this.time.delayedCall(90, () => {
       this.applyPunchDamage(this.lastFacing.direction);
+      
+      // Pequeña vibración de cámara (camera shake) para impacto
+      this.cameras.main.shake(150, 0.002);
     });
 
     this.player.once('animationcomplete', () => {
@@ -616,6 +652,7 @@ export default class GameScene extends Phaser.Scene {
   applyPunchDamage(direction) {
     const punchHitbox = this.getPunchHitbox(direction);
     let hitCount = 0;
+    const knockbackForce = 120; // Fuerza de knockback
 
     this.slimeGroup.getChildren().forEach((slime) => {
       if (!slime.active) {
@@ -623,13 +660,39 @@ export default class GameScene extends Phaser.Scene {
       }
 
       if (Phaser.Geom.Intersects.RectangleToRectangle(punchHitbox, slime.getBounds())) {
+        // Infligir daño
         slime.takeDamage(1);
         this.score += 10;
         hitCount += 1;
+        
+        // Knockback visual
+        const directionVector = this.getFacingDirection(); 
+        const knockbackX = directionVector.x * knockbackForce;
+        const knockbackY = directionVector.y * knockbackForce; 
+        
+        // Aplicar velocidad de knockback
+        slime.body.setVelocity(knockbackX, knockbackY);
+        
+        // Flash visual del impacto
+        slime.setTint(0xff8888);
+        this.time.delayedCall(100, () => {
+          if (slime && slime.active) {
+            slime.clearTint();
+          }
+        });
       }
     });
 
     if (hitCount > 0) {
+      // Feedback visual en el jugador: pequeño destello o escala
+      const originalScale = this.player.scale;
+      this.player.setScale(originalScale * 1.1);
+      this.time.delayedCall(80, () => {
+        if (this.player && this.player.active) {
+          this.player.setScale(originalScale);
+        }
+      });
+      
       this.updateHud();
     }
   }
@@ -971,4 +1034,20 @@ export default class GameScene extends Phaser.Scene {
       // ignore
     }
   }
+
+  /**
+   * Obtiene el mapa de habitación correcto basado en el índice de habitación
+   * @param {number} roomIndex - El índice de la habitación (1, 2, 3)
+   * @returns {object} El objeto de configuración del mapa
+   */
+  getRoomMapByIndex(roomIndex) {
+  switch (roomIndex) {
+    case 2:
+      return room02;
+    case 3:
+      return room03;
+    default:
+      return room01;
+  }
+}
 }

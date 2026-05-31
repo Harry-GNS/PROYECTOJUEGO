@@ -81,6 +81,10 @@ export default class BootScene extends Phaser.Scene {
       new URL(`${audioFolder}/gameover.ogg`, import.meta.url).href,
       new URL(`${audioFolder}/gameover.mp3`, import.meta.url).href
     ]);
+    // Efectos de sonido
+    this.load.audio('sfx-slime-death', [
+      new URL(`${audioFolder}/slimedeath.mp3`, import.meta.url).href
+    ]);
   }
   create() {
     for (let index = 1; index <= 30; index += 1) {

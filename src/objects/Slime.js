@@ -153,6 +153,12 @@ export default class Slime extends Phaser.Physics.Arcade.Sprite {
     this.state = 'death';
     this.body.enable = false;
     this.body.setVelocity(0, 0);
+    // Reproducir efecto de sonido de muerte si está disponible
+    try {
+      this.sceneRef.sound.play('sfx-slime-death', { volume: 0.20 });
+    } catch (e) {
+      // Si el sonido no está cargado o hay un error, no interrumpimos la lógica
+    }
     this.anims.play('slime-death', true);
 
     this.once('animationcomplete-slime-death', () => {

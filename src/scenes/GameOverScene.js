@@ -56,7 +56,7 @@ export default class GameOverScene extends Phaser.Scene {
       .setOrigin(0.5)
       .setDepth(3);
 
-    this.input.keyboard.once('keydown-N', () => this.scene.start('GameScene'));
+    this.input.keyboard.once('keydown-N', () => this.scene.start('GameScene', { score: 0 }));
     this.input.keyboard.once('keydown-ENTER', () => this.scene.start('MenuScene'));
 
     this.events.once('shutdown', () => {

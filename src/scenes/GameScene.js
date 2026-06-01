@@ -1,7 +1,5 @@
 import Phaser from 'phaser';
 import room01 from '../maps/room01.js';
-import room02 from '../maps/room02.js';
-import room03 from '../maps/room03.js';
 import Slime from '../objects/Slime.js';
 
 export default class GameScene extends Phaser.Scene {
@@ -9,7 +7,7 @@ export default class GameScene extends Phaser.Scene {
     super({ key: 'GameScene' });
   }
   create(data = {}) {
-    this.roomIndex = data.roomIndex ?? 1;
+    this.roomIndex = 1;
     this.score = data.score ?? 0;
     this.playerHealth = 3;
     this.playerMaxHealth = 3;
@@ -17,12 +15,13 @@ export default class GameScene extends Phaser.Scene {
     this.gameOver = false;
     this.roomKey = null;
     this.keyCollected = false;
+    this.currentWaveSize = 3;
 
     this.createGameplayTextures();
     this.createSlimeAnimations();
     
-    // Obtener el mapa correcto basado en roomIndex
-    const currentRoomMap = this.getRoomMapByIndex(this.roomIndex);
+    // Un solo room: siempre usamos room01
+    const currentRoomMap = room01;
     this.createSmallMap(currentRoomMap);
     this.createPlayerAnimations();
 
@@ -235,6 +234,7 @@ export default class GameScene extends Phaser.Scene {
   spawnRoomSlimes(room) {
     // Número base de slimes = 3, aumentar 1 por cada nivel adicional
     const count = 3 + Math.max(0, (this.roomIndex || 1) - 1);
+    this.currentWaveSize = count;
     const used = [];
 
     for (let i = 0; i < count; i += 1) {
@@ -404,6 +404,7 @@ export default class GameScene extends Phaser.Scene {
       this.physics.add.collider(slime, this.wallLayer);
       this.physics.add.collider(slime, this.player);
     }
+    this.currentWaveSize = Math.max(this.currentWaveSize || 3, count);
     this.updateHud();
   }
 
@@ -478,28 +479,15 @@ export default class GameScene extends Phaser.Scene {
     }
     this.score += 100;
     this.updateHud();
-    this.showMessage('¡Habitación completada!');
+    this.showMessage('Nueva oleada');
 
-    // Verificar si es la última habitación
-    if (this.roomIndex >= 3) {
-      this.time.delayedCall(1000, () => {
-        this.gameOver = true;
-        this.score += 500; 
-        this.showMessage(`¡VICTORIA! Puntuación final: ${this.score}`);
-        this.time.delayedCall(3000, () => {
-          this.scene.start('MenuScene', { score: this.score });
-        });
-      });
-    } else {
-      // === CÓDIGO CORREGIDO PARA CAMBIO DE HABITACIÓN ===
-      this.time.delayedCall(500, () => {
-        // Reiniciamos la escena por completo pasando el nuevo cuarto y manteniendo el puntaje
-        this.scene.restart({ 
-          roomIndex: (this.roomIndex || 1) + 1, 
-          score: this.score 
-        });
-      });
-    }
+    // Mismo room: al recoger la llave salen más slimes, sin cambiar de escena.
+    this.time.delayedCall(500, () => {
+      const spawnCount = Math.min((this.currentWaveSize || 3) + 1, 6);
+      this.spawnAdditionalSlimes(this.currentRoom || room01, spawnCount);
+      this.currentWaveSize = spawnCount;
+      this.keyCollected = false;
+    });
   }
 
   startPunch() {
@@ -562,7 +550,9 @@ export default class GameScene extends Phaser.Scene {
 
     if (this.playerHealth <= 0) {
       this.gameOver = true;
-      this.scene.start('GameOverScene', { score: this.score });
+      this.time.delayedCall(400, () => {
+        this.scene.start('GameOverScene', { score: this.score });
+      });
     }
   }
 
@@ -1035,19 +1025,4 @@ export default class GameScene extends Phaser.Scene {
     }
   }
 
-  /**
-   * Obtiene el mapa de habitación correcto basado en el índice de habitación
-   * @param {number} roomIndex - El índice de la habitación (1, 2, 3)
-   * @returns {object} El objeto de configuración del mapa
-   */
-  getRoomMapByIndex(roomIndex) {
-  switch (roomIndex) {
-    case 2:
-      return room02;
-    case 3:
-      return room03;
-    default:
-      return room01;
-  }
-}
 }

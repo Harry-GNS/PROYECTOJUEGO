@@ -1,26 +1,54 @@
-# Proyecto Juego — Estación de Cuarentena
+# Estación de Cuarentena
 
-Este repositorio es un scaffold inicial para el proyecto de videojuego con Phaser.js basado en los documentos de la materia.
+Videojuego desarrollado con Phaser.js
 
-- Contenido de diseño y requisitos: [`descripcion.md`](descripcion.md)
-
-Cómo ejecutar (recomendado con Node.js instalado):
-
-1. Instalar dependencias
+## 🚀 Ejecución Rápida
 
 ```bash
 npm install
-```
-
-2. Ejecutar servidor de desarrollo
-
-```bash
 npm run dev
 ```
 
-El frontend se sirve desde `index.html` y el punto de entrada es `src/main.js`.
+Accede a `http://localhost:5173` en tu navegador.
 
-Siguiente pasos sugeridos:
-- Añadir assets en `src/assets/`.
-- Implementar escenas en `src/scenes/` siguiendo la arquitectura sugerida.
-- Completar HUD, audio y persistencia en `src/managers/`.
+## 🎮 Controles
+
+| Acción | Tecla |
+|--------|-------|
+| Movimiento Arriba | W / ↑ |
+| Movimiento Abajo | S / ↓ |
+| Movimiento Izquierda | A / ← |
+| Movimiento Derecha | D / → |
+| Saltar | Espacio |
+| Pausa | ESC |
+| Acción | E |
+
+## 📁 Estructura del Proyecto
+
+```
+src/
+├── main.js           # Punto de entrada
+├── scenes/           # Escenas del juego
+├── assets/           # Imágenes, audio y sprites
+└── managers/         # HUD, audio, persistencia
+index.html           # HTML principal
+```
+
+## 📋 Requisitos
+
+- Node.js 16+
+- npm
+
+## 📚 Documentación
+
+- [Diseño y Requisitos](descripcion.md)
+
+## 👥 Créditos
+
+**Desarrollador:** Harry-GNS  
+**Motor:** Phaser.js  
+**Lenguaje:** JavaScript
+
+---
+
+*Última actualización: junio 2026*

@@ -44,8 +44,10 @@ index.html            # HTML principal
 
 ## 👥 Créditos
 
-**Desarrollador:** Harry Guajan, Luis Tipan, David Egas, Michael Yanez 
+**Desarrollador:** Harry Guajan, Luis Tipan, David Egas, Michael Yanez.
+
 **Motor:** Phaser.js  
+
 **Lenguaje:** JavaScript
 
 ---

@@ -19,8 +19,8 @@ Accede a `http://localhost:5173` en tu navegador.
 | Movimiento Abajo | ↓ |
 | Movimiento Izquierda | ← |
 | Movimiento Derecha | → |
-| Saltar | Espacio |
-| Acción | E |
+| Atacar | Espacio |
+| Nueva Partida | N |
 
 ## 📁 Estructura del Proyecto
 

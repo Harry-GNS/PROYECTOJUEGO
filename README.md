@@ -15,12 +15,11 @@ Accede a `http://localhost:5173` en tu navegador.
 
 | Acción | Tecla |
 |--------|-------|
-| Movimiento Arriba | W / ↑ |
-| Movimiento Abajo | S / ↓ |
-| Movimiento Izquierda | A / ← |
-| Movimiento Derecha | D / → |
+| Movimiento Arriba | ↑ |
+| Movimiento Abajo | ↓ |
+| Movimiento Izquierda | ← |
+| Movimiento Derecha | → |
 | Saltar | Espacio |
-| Pausa | ESC |
 | Acción | E |
 
 ## 📁 Estructura del Proyecto
@@ -31,7 +30,7 @@ src/
 ├── scenes/           # Escenas del juego
 ├── assets/           # Imágenes, audio y sprites
 └── managers/         # HUD, audio, persistencia
-index.html           # HTML principal
+index.html            # HTML principal
 ```
 
 ## 📋 Requisitos
@@ -45,10 +44,8 @@ index.html           # HTML principal
 
 ## 👥 Créditos
 
-**Desarrollador:** Harry-GNS  
+**Desarrollador:** Harry Guajan, Luis Tipan, David Egas, Michael Yanez 
 **Motor:** Phaser.js  
 **Lenguaje:** JavaScript
 
 ---
-
-*Última actualización: junio 2026*
